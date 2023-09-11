@@ -1,0 +1,85 @@
+
+variables:
+  SHELL: bash
+
+
+stages:
+  - build
+  - test
+  - deploy
+
+cache:
+  paths:
+    - CentralizedHealthSystemWebAPI/node_modules/
+    - CentralizedHealthSystemWebApp/chswebapp/node_modules/
+
+backend-build:
+  stage: build
+
+  script:
+    - cd CentralizedHealthSystemWebAPI
+    - npm install
+  artifacts:
+    paths:
+    - CentralizedHealthSystemWebAPI
+  tags:
+    - CSCI5308
+
+frontend-build:
+  stage: build
+
+  script:
+    - cd CentralizedHealthSystemWebApp/chswebapp
+    - npm install
+    - CI=false npm run build
+  artifacts:
+    paths:
+      - CentralizedHealthSystemWebApp/chswebapp/build/
+  tags:
+    - CSCI5308
+
+# frontend-test:
+#   stage: test
+
+#   script:
+#     - cd CentralizedHealthSystemWebApp/chswebapp
+#     - CI=false npm run test
+  
+#   tags:
+#     - CSCI5308
+
+# backend-test:
+#   stage: test
+#   script:
+#     - cd CentralizedHealthSystemWebAPI
+#     - CI=false npm run test
+  
+#   tags:
+#     - CSCI5308
+
+
+backend-deploy:
+  stage: deploy
+  dependencies:
+    - backend-build
+    # - backend-test
+  script:
+    - scp -o StrictHostKeyChecking=no -i /home/gitlab-runner/.ssh/root_key -r CentralizedHealthSystemWebAPI/* root@csci5308vm18.research.cs.dal.ca:/var/www/backend/
+    - ssh -t -o StrictHostKeyChecking=no -i /home/gitlab-runner/.ssh/root_key root@csci5308vm18.research.cs.dal.ca 'cd /var/www/backend/ && npm install && pm2 restart server'
+  tags:
+    - CSCI5308
+
+frontend-deploy:
+  stage: deploy
+  dependencies:
+    - frontend-build
+  before_script:
+    - ssh -t -o StrictHostKeyChecking=no -i /home/gitlab-runner/.ssh/root_key root@csci5308vm18.research.cs.dal.ca 'find /var/www/frontend -delete && mkdir /var/www/frontend/'
+  script:
+    - scp -o StrictHostKeyChecking=no -i /home/gitlab-runner/.ssh/root_key -r CentralizedHealthSystemWebApp/chswebapp/build/* root@csci5308vm18.research.cs.dal.ca:/var/www/frontend/
+  after_script:
+    - ssh -t -o StrictHostKeyChecking=no -i /home/gitlab-runner/.ssh/root_key root@csci5308vm18.research.cs.dal.ca 'systemctl restart nginx'
+  tags:
+    - CSCI5308
+
+
